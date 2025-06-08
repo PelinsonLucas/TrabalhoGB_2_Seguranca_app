@@ -4,67 +4,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de CVE e Calculadora CVSS</title>
-    <!-- Tailwind CSS -->
+    <title>Calculadora CVSS 4.0 Interativa</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Fonte Inter -->
-    <link rel="preconnect" href="https://rsms.me/">
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <style>
-        /* Estilos adicionais para melhorar a aparência */
         html { font-family: 'Inter', sans-serif; }
-        @supports (font-variation-settings: normal) {
-            html { font-family: 'Inter var', sans-serif; }
-        }
-        .card {
-            background-color: white;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-            border: 1px solid #e5e7eb;
-        }
-        .score-box {
-            border-radius: 0.5rem;
-            padding: 1rem 1.5rem;
-            text-align: center;
-        }
-        .score-low { background-color: #fefcbf; color: #92400e; border: 1px solid #fde68a; }
-        .score-medium { background-color: #fed7aa; color: #9a3412; border: 1px solid #fdba74; }
-        .score-high { background-color: #fecaca; color: #991b1b; border: 1px solid #fca5a5; }
-        .score-critical { background-color: #e0b0ff; color: #5b21b6; border: 1px solid #d8b4fe; }
-        .score-none { background-color: #e5e7eb; color: #4b5563; border: 1px solid #d1d5db; }
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+        .score-box { border-radius: 0.5rem; padding: 1rem; text-align: center; }
+        .score-low { background-color: #fefce8; color: #a16207; border-color: #fde68a; }
+        .score-medium { background-color: #fff7ed; color: #c2410c; border-color: #fdba74; }
+        .score-high { background-color: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+        .score-critical { background-color: #fce7f3; color: #9d174d; border-color: #fbcfe8; }
+        .score-none { background-color: #f9fafb; color: #4b5563; border-color: #d1d5db; }
+        .metric-group { border-top: 1px solid #e5e7eb; padding-top: 1.5rem; margin-top: 1.5rem; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
-    <div class="container mx-auto p-4 md:p-8">
+<body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
 
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Analisador de Vulnerabilidades (CVE)</h1>
-            <p class="text-md text-gray-600 mt-2">Insira um ID de CVE para ver detalhes e calcular a pontuação CVSS v3.1</p>
+            <h1 class="text-4xl font-bold tracking-tight text-gray-900">Calculadora CVSS 4.0 Completa</h1>
+            <p class="text-lg text-gray-600 mt-2">Calcule pontuações ou preencha a calculadora a partir de uma CVE.</p>
         </header>
-        
-        <!-- Formulário de Busca -->
-        <div class="max-w-2xl mx-auto card p-6 mb-8">
-            <form action="{{ url_for('main.search_cve') }}" method="POST">
-                <label for="cve_id" class="block text-sm font-medium text-gray-700 mb-2">ID da Vulnerabilidade (ex: CVE-2021-34527)</label>
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="text" name="cve_id" id="cve_id" required class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="CVE-XXXX-XXXXX">
-                    <button type="submit" class="w-full sm:w-auto inline-flex justify-center items-center px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Analisar
-                    </button>
+
+        <!-- Formulário para preencher com CVE -->
+        <div class="card p-6 mb-8">
+            <form action="{{ url_for('main.prefill_calculator') }}" method="POST">
+                <label for="cve_id" class="block text-sm font-semibold text-gray-700">Preencher com uma CVE (Opcional)</label>
+                <div class="mt-2 flex flex-col sm:flex-row gap-2">
+                    <input type="text" name="cve_id" id="cve_id" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: CVE-2024-24919">
+                    <button type="submit" class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Buscar e Preencher</button>
                 </div>
             </form>
         </div>
 
-        <!-- Seção de Alertas e Mensagens -->
+        <!-- Mensagens e Alertas -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="max-w-2xl mx-auto mb-8">
+                <div class="mb-8 space-y-4">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-md 
-                        {% if category == 'danger' %} bg-red-100 text-red-700 
-                        {% elif category == 'success' %} bg-green-100 text-green-700 
-                        {% else %} bg-yellow-100 text-yellow-700 {% endif %}"
-                        role="alert">
+                    {% set cat_color = 'blue' if category == 'info' else 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' %}
+                    <div class="p-4 rounded-md bg-{{cat_color}}-50 text-{{cat_color}}-800 border border-{{cat_color}}-200" role="alert">
                         <p>{{ message }}</p>
                     </div>
                 {% endfor %}
@@ -72,144 +52,131 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Seção de Resultados -->
-        {% if cve %}
-        <div class="max-w-4xl mx-auto">
-            <!-- Card de Informações Gerais -->
-            <div class="card p-6 md:p-8 mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 mb-1">
-                    {{ cve.id }} 
-                    {% if cve.recalculated %}<span class="text-sm font-normal text-indigo-600">(Pontuação Recalculada)</span>{% endif %}
-                </h2>
-                <!-- Usamos 'safe' aqui porque a descrição pode conter tags <p>, mas confiamos na fonte. Em um cenário mais rigoroso, seria melhor usar uma biblioteca de sanitização de HTML. -->
-                <div class="text-gray-600 prose max-w-none">{{ cve.summary|safe }}</div>
-                
-                {% if cve.references %}
-                <div class="mt-6">
-                    <h3 class="text-lg font-semibold text-gray-800">Referências</h3>
-                    <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
-                        {% for ref in cve.references[:5] %} <!-- Mostra até 5 referências -->
-                        <li><a href="{{ ref }}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">{{ ref }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Card de Pontuação CVSS -->
-            <div class="card p-6 md:p-8 mb-8">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Pontuação CVSS v3.1</h3>
-                
-                {% if cve.cvss_obj %}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    {% set base_sev = get_severity(cve.scores.base) %}
-                    {% set temp_sev = get_severity(cve.scores.temporal) %}
-                    {% set env_sev = get_severity(cve.scores.environmental) %}
-                    <div class="score-box {{ 'score-' + base_sev.split(' ')[0]|lower }}">
-                        <div class="text-sm font-semibold uppercase tracking-wider">Base</div>
-                        <div class="text-3xl font-bold">{{ cve.scores.base }}</div>
-                        <div class="text-sm">{{ base_sev.split(' ')[0] }}</div>
-                    </div>
-                    <div class="score-box {{ 'score-' + temp_sev.split(' ')[0]|lower }}">
-                        <div class="text-sm font-semibold uppercase tracking-wider">Temporal</div>
-                        <div class="text-3xl font-bold">{{ cve.scores.temporal }}</div>
-                        <div class="text-sm">{{ temp_sev.split(' ')[0] }}</div>
-                    </div>
-                     <div class="score-box {{ 'score-' + env_sev.split(' ')[0]|lower }}">
-                        <div class="text-sm font-semibold uppercase tracking-wider">Ambiental</div>
-                        <div class="text-3xl font-bold">{{ cve.scores.environmental }}</div>
-                        <div class="text-sm">{{ env_sev.split(' ')[0] }}</div>
-                    </div>
-                </div>
-                <div class="text-center bg-gray-100 p-2 rounded-md">
-                    <p class="text-sm text-gray-600 font-mono break-all">{{ cve.cvss_vector_v3 }}</p>
-                </div>
-                {% else %}
-                <p class="text-gray-500">Nenhuma informação CVSS v3.1 disponível para esta CVE na API.</p>
-                {% endif %}
-            </div>
-
-            <!-- Formulário da Calculadora Ambiental e Temporal -->
-            {% if cve.cvss_obj %}
-            <div class="card p-6 md:p-8">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Calculadora CVSS Interativa</h3>
-                <p class="text-sm text-gray-600 mb-6">A API forneceu as métricas básicas. Preencha ou ajuste as métricas Temporais e Ambientais abaixo para recalcular a pontuação de acordo com o seu ambiente.</p>
-                
-                <form action="{{ url_for('main.recalculate_cvss') }}" method="POST">
-                    <!-- Campos ocultos para passar dados necessários para o recálculo -->
-                    <input type="hidden" name="original_vector" value="{{ cve.cvss_obj.vector }}">
-                    <input type="hidden" name="cve_id_hidden" value="{{ cve.id }}">
-                    <input type="hidden" name="summary_hidden" value="{{ cve.summary }}">
-
-                    <!-- Métricas Temporais -->
-                    <div class="mb-6">
-                        <h4 class="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">Métricas Temporais</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                                <label for="E" class="block text-sm font-medium">Maturidade do Código de Exploração (E)</label>
-                                <!-- CORREÇÃO APLICADA AQUI -->
-                                <select id="E" name="E" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" {% if cve.cvss_obj.E == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
-                                    <option value="H" {% if cve.cvss_obj.E == 'H' %}selected{% endif %}>Alto</option>
-                                    <option value="F" {% if cve.cvss_obj.E == 'F' %}selected{% endif %}>Funcional</option>
-                                    <option value="P" {% if cve.cvss_obj.E == 'P' %}selected{% endif %}>Prova de Conceito</option>
-                                    <option value="U" {% if cve.cvss_obj.E == 'U' %}selected{% endif %}>Não Comprovado</option>
-                                </select>
-                            </div>
-                            <!-- Outros campos Temporais (RL, RC) podem ser adicionados aqui seguindo o mesmo padrão -->
-                        </div>
-                    </div>
-                    
-                    <!-- Métricas Ambientais (exemplo com alguns campos) -->
-                    <div class="mb-6">
-                        <h4 class="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">Métricas Ambientais</h4>
-                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                                <label for="CR" class="block text-sm font-medium">Requisito de Confidencialidade (CR)</label>
-                                <!-- CORREÇÃO APLICADA AQUI -->
-                                <select id="CR" name="CR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" {% if cve.cvss_obj.CR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
-                                    <option value="H" {% if cve.cvss_obj.CR == 'H' %}selected{% endif %}>Alto</option>
-                                    <option value="M" {% if cve.cvss_obj.CR == 'M' %}selected{% endif %}>Médio</option>
-                                    <option value="L" {% if cve.cvss_obj.CR == 'L' %}selected{% endif %}>Baixo</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="IR" class="block text-sm font-medium">Requisito de Integridade (IR)</label>
-                                <select id="IR" name="IR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" {% if cve.cvss_obj.IR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
-                                    <option value="H" {% if cve.cvss_obj.IR == 'H' %}selected{% endif %}>Alto</option>
-                                    <option value="M" {% if cve.cvss_obj.IR == 'M' %}selected{% endif %}>Médio</option>
-                                    <option value="L" {% if cve.cvss_obj.IR == 'L' %}selected{% endif %}>Baixo</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="AR" class="block text-sm font-medium">Requisito de Disponibilidade (AR)</label>
-                                <select id="AR" name="AR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" {% if cve.cvss_obj.AR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
-                                    <option value="H" {% if cve.cvss_obj.AR == 'H' %}selected{% endif %}>Alto</option>
-                                    <option value="M" {% if cve.cvss_obj.AR == 'M' %}selected{% endif %}>Médio</option>
-                                    <option value="L" {% if cve.cvss_obj.AR == 'L' %}selected{% endif %}>Baixo</option>
-                                </select>
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-4">Nota: Outras métricas ambientais modificadas (MAV, MAC, etc.) podem ser adicionadas seguindo este mesmo padrão.</p>
-                    </div>
-
-                    <div class="text-right">
-                        <button type="submit" class="inline-flex justify-center items-center px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                            Recalcular Pontuação
-                        </button>
-                    </div>
-                </form>
-            </div>
-            {% endif %}
+        <!-- Card de Informações da CVE (se existir) -->
+        {% if cve_info and cve_info.id %}
+        <div class="card p-6 md:p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ cve_info.id }}</h2>
+            <div class="text-gray-600 prose max-w-none">{{ cve_info.summary|safe }}</div>
         </div>
         {% endif %}
 
-        <footer class="text-center mt-12 text-sm text-gray-500">
-            <p>Trabalho Prático - Segurança de aplicações</p>
-        </footer>
+        <!-- Seção de Resultados -->
+        {% if results %}
+        <div class="card p-6 mb-8">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Resultados do Cálculo</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="score-box border score-{{ results.base.severity.class }}">
+                    <div>Base ({{ results.base.severity.name }})</div>
+                    <div class="text-3xl font-bold">{{ "%.1f"|format(results.base.score) }}</div>
+                </div>
+                <div class="score-box border score-{{ results.threat.severity.class }}">
+                    <div>Ameaça ({{ results.threat.severity.name }})</div>
+                    <div class="text-3xl font-bold">{{ "%.1f"|format(results.threat.score) if results.threat.score is not none else '-' }}</div>
+                </div>
+                <div class="score-box border score-{{ results.environmental.severity.class }}">
+                    <div>Ambiental ({{ results.environmental.severity.name }})</div>
+                    <div class="text-3xl font-bold">{{ "%.1f"|format(results.environmental.score) if results.environmental.score is not none else '-' }}</div>
+                </div>
+            </div>
+            <div class="text-center bg-gray-100 p-3 rounded-md">
+                <p class="text-sm text-gray-800 font-semibold">Vetor Calculado:</p>
+                <p class="text-sm text-gray-600 font-mono break-all">{{ results.vector }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Formulário da Calculadora -->
+        <form action="{{ url_for('main.calculate') }}" method="POST">
+            {% if cve_info %}
+                <input type="hidden" name="cve_id_hidden" value="{{ cve_info.id }}">
+                <input type="hidden" name="summary_hidden" value="{{ cve_info.summary }}">
+            {% endif %}
+            
+            <div class="card p-6 md:p-8">
+                {% set metrics = cve_info.metrics if cve_info else {} %}
+                
+                <!-- ########## Métricas Base ########## -->
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Métricas Base</h2>
+                <div class="metric-group !mt-0 !pt-0">
+                    <h3 class="text-lg font-semibold text-gray-900">Métricas de Explorabilidade</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Vetor de Ataque (AV)</label><select name="AV" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="N" {% if metrics.AV == 'N' %}selected{% endif %}>Rede</option><option value="A" {% if metrics.AV == 'A' %}selected{% endif %}>Adjacente</option><option value="L" {% if metrics.AV == 'L' %}selected{% endif %}>Local</option><option value="P" {% if metrics.AV == 'P' %}selected{% endif %}>Físico</option></select></div>
+                        <div><label class="block text-sm font-medium">Complexidade (AC)</label><select name="AC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="L" {% if metrics.AC == 'L' %}selected{% endif %}>Baixa</option><option value="H" {% if metrics.AC == 'H' %}selected{% endif %}>Alta</option></select></div>
+                        <div><label class="block text-sm font-medium">Req. de Ataque (AT)</label><select name="AT" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="N" {% if metrics.AT == 'N' %}selected{% endif %}>Nenhum</option><option value="P" {% if metrics.AT == 'P' %}selected{% endif %}>Presente</option></select></div>
+                        <div><label class="block text-sm font-medium">Privilégios (PR)</label><select name="PR" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="N" {% if metrics.PR == 'N' %}selected{% endif %}>Nenhum</option><option value="L" {% if metrics.PR == 'L' %}selected{% endif %}>Baixo</option><option value="H" {% if metrics.PR == 'H' %}selected{% endif %}>Alto</option></select></div>
+                        <div><label class="block text-sm font-medium">Interação (UI)</label><select name="UI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="N" {% if metrics.UI == 'N' %}selected{% endif %}>Nenhuma</option><option value="P" {% if metrics.UI == 'P' %}selected{% endif %}>Passiva</option><option value="A" {% if metrics.UI == 'A' %}selected{% endif %}>Ativa</option></select></div>
+                    </div>
+                </div>
+                <div class="metric-group">
+                    <h3 class="text-lg font-semibold text-gray-900">Impacto no Sistema Vulnerável</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Confidencialidade (VC)</label><select name="VC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.VC == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.VC == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.VC == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">Integridade (VI)</label><select name="VI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.VI == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.VI == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.VI == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">Disponibilidade (VA)</label><select name="VA" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.VA == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.VA == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.VA == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                    </div>
+                </div>
+                <div class="metric-group">
+                     <h3 class="text-lg font-semibold text-gray-900">Impacto no Sistema Subsequente</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Confidencialidade (SC)</label><select name="SC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.SC == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.SC == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.SC == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">Integridade (SI)</label><select name="SI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.SI == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.SI == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.SI == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">Disponibilidade (SA)</label><select name="SA" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="H" {% if metrics.SA == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.SA == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.SA == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                    </div>
+                </div>
+
+                <!-- ########## Métricas de Ameaça ########## -->
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">Métricas de Ameaça</h2>
+                <div class="metric-group !mt-0 !pt-0">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Maturidade do Exploit (E)</label><select name="E" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.E or metrics.E == 'X' %}selected{% endif %}>Não Definido</option><option value="A" {% if metrics.E == 'A' %}selected{% endif %}>Atingível</option><option value="P" {% if metrics.E == 'P' %}selected{% endif %}>Prova de Conceito</option><option value="U" {% if metrics.E == 'U' %}selected{% endif %}>Não Relatado</option></select></div>
+                    </div>
+                </div>
+
+                <!-- ########## Métricas Ambientais ########## -->
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">Métricas Ambientais</h2>
+                <div class="metric-group !mt-0 !pt-0">
+                    <h3 class="text-lg font-semibold text-gray-900">Requisitos de Segurança</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Confidencialidade (CR)</label><select name="CR" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.CR or metrics.CR == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.CR == 'H' %}selected{% endif %}>Alto</option><option value="M" {% if metrics.CR == 'M' %}selected{% endif %}>Médio</option><option value="L" {% if metrics.CR == 'L' %}selected{% endif %}>Baixo</option></select></div>
+                        <div><label class="block text-sm font-medium">Integridade (IR)</label><select name="IR" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.IR or metrics.IR == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.IR == 'H' %}selected{% endif %}>Alto</option><option value="M" {% if metrics.IR == 'M' %}selected{% endif %}>Médio</option><option value="L" {% if metrics.IR == 'L' %}selected{% endif %}>Baixo</option></select></div>
+                        <div><label class="block text-sm font-medium">Disponibilidade (AR)</label><select name="AR" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.AR or metrics.AR == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.AR == 'H' %}selected{% endif %}>Alto</option><option value="M" {% if metrics.AR == 'M' %}selected{% endif %}>Médio</option><option value="L" {% if metrics.AR == 'L' %}selected{% endif %}>Baixo</option></select></div>
+                    </div>
+                </div>
+                <div class="metric-group">
+                    <h3 class="text-lg font-semibold text-gray-900">Métricas de Base Modificadas</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">AV Modificado (MAV)</label><select name="MAV" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MAV or metrics.MAV == 'X' %}selected{% endif %}>Não Definido</option><option value="N" {% if metrics.MAV == 'N' %}selected{% endif %}>Rede</option><option value="A" {% if metrics.MAV == 'A' %}selected{% endif %}>Adjacente</option><option value="L" {% if metrics.MAV == 'L' %}selected{% endif %}>Local</option><option value="P" {% if metrics.MAV == 'P' %}selected{% endif %}>Físico</option></select></div>
+                        <div><label class="block text-sm font-medium">AC Modificado (MAC)</label><select name="MAC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MAC or metrics.MAC == 'X' %}selected{% endif %}>Não Definido</option><option value="L" {% if metrics.MAC == 'L' %}selected{% endif %}>Baixa</option><option value="H" {% if metrics.MAC == 'H' %}selected{% endif %}>Alta</option></select></div>
+                        <div><label class="block text-sm font-medium">AT Modificado (MAT)</label><select name="MAT" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MAT or metrics.MAT == 'X' %}selected{% endif %}>Não Definido</option><option value="N" {% if metrics.MAT == 'N' %}selected{% endif %}>Nenhum</option><option value="P" {% if metrics.MAT == 'P' %}selected{% endif %}>Presente</option></select></div>
+                        <div><label class="block text-sm font-medium">PR Modificado (MPR)</label><select name="MPR" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MPR or metrics.MPR == 'X' %}selected{% endif %}>Não Definido</option><option value="N" {% if metrics.MPR == 'N' %}selected{% endif %}>Nenhum</option><option value="L" {% if metrics.MPR == 'L' %}selected{% endif %}>Baixo</option><option value="H" {% if metrics.MPR == 'H' %}selected{% endif %}>Alto</option></select></div>
+                        <div><label class="block text-sm font-medium">UI Modificado (MUI)</label><select name="MUI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MUI or metrics.MUI == 'X' %}selected{% endif %}>Não Definido</option><option value="N" {% if metrics.MUI == 'N' %}selected{% endif %}>Nenhuma</option><option value="P" {% if metrics.MUI == 'P' %}selected{% endif %}>Passiva</option><option value="A" {% if metrics.MUI == 'A' %}selected{% endif %}>Ativa</option></select></div>
+                        <div><label class="block text-sm font-medium">VC Modificado (MVC)</label><select name="MVC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MVC or metrics.MVC == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MVC == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MVC == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MVC == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">VI Modificado (MVI)</label><select name="MVI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MVI or metrics.MVI == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MVI == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MVI == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MVI == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">VA Modificado (MVA)</label><select name="MVA" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MVA or metrics.MVA == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MVA == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MVA == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MVA == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">SC Modificado (MSC)</label><select name="MSC" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MSC or metrics.MSC == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MSC == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MSC == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MSC == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">SI Modificado (MSI)</label><select name="MSI" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MSI or metrics.MSI == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MSI == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MSI == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MSI == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                        <div><label class="block text-sm font-medium">SA Modificado (MSA)</label><select name="MSA" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.MSA or metrics.MSA == 'X' %}selected{% endif %}>Não Definido</option><option value="H" {% if metrics.MSA == 'H' %}selected{% endif %}>Alta</option><option value="L" {% if metrics.MSA == 'L' %}selected{% endif %}>Baixa</option><option value="N" {% if metrics.MSA == 'N' %}selected{% endif %}>Nenhuma</option></select></div>
+                    </div>
+                </div>
+                
+                <!-- ########## Métricas Suplementares ########## -->
+                <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4">Métricas Suplementares (Informativas)</h2>
+                <div class="metric-group !mt-0 !pt-0">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-4">
+                        <div><label class="block text-sm font-medium">Segurança (S)</label><select name="S" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.S or metrics.S == 'X' %}selected{% endif %}>Não Definido</option><option value="N" {% if metrics.S == 'N' %}selected{% endif %}>Negligenciável</option><option value="P" {% if metrics.S == 'P' %}selected{% endif %}>Presente</option></select></div>
+                        <div><label class="block text-sm font-medium">Automatizável (AU)</label><select name="AU" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.AU or metrics.AU == 'X' %}selected{% endif %}>Não Definido</option><option value="Y" {% if metrics.AU == 'Y' %}selected{% endif %}>Sim</option><option value="N" {% if metrics.AU == 'N' %}selected{% endif %}>Não</option></select></div>
+                        <div><label class="block text-sm font-medium">Recuperação (R)</label><select name="R" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.R or metrics.R == 'X' %}selected{% endif %}>Não Definido</option><option value="A" {% if metrics.R == 'A' %}selected{% endif %}>Automática</option><option value="I" {% if metrics.R == 'I' %}selected{% endif %}>Irrecuperável</option><option value="L" {% if metrics.R == 'L' %}selected{% endif %}>Laboriosa</option></select></div>
+                        <div><label class="block text-sm font-medium">Densidade de Valor (V)</label><select name="V" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.V or metrics.V == 'X' %}selected{% endif %}>Não Definido</option><option value="D" {% if metrics.V == 'D' %}selected{% endif %}>Difusa</option><option value="C" {% if metrics.V == 'C' %}selected{% endif %}>Concentrada</option></select></div>
+                        <div><label class="block text-sm font-medium">Esforço de Resposta (RE)</label><select name="RE" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.RE or metrics.RE == 'X' %}selected{% endif %}>Não Definido</option><option value="L" {% if metrics.RE == 'L' %}selected{% endif %}>Baixo</option><option value="M" {% if metrics.RE == 'M' %}selected{% endif %}>Médio</option><option value="H" {% if metrics.RE == 'H' %}selected{% endif %}>Alto</option></select></div>
+                        <div><label class="block text-sm font-medium">Urgência do Fornecedor (P)</label><select name="P" class="mt-1 w-full rounded-md border-gray-300 shadow-sm"><option value="X" {% if not metrics.P or metrics.P == 'X' %}selected{% endif %}>Não Definido</option><option value="C" {% if metrics.P == 'C' %}selected{% endif %}>Limpar</option><option value="G" {% if metrics.P == 'G' %}selected{% endif %}>Verde</option><option value="A" {% if metrics.P == 'A' %}selected{% endif %}>Âmbar</option><option value="R" {% if metrics.P == 'R' %}selected{% endif %}>Vermelho</option></select></div>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <button type="submit" class="w-full sm:w-1/2 inline-flex justify-center items-center px-8 py-3 border border-transparent text-lg font-bold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">Calcular Pontuação</button>
+                </div>
+            </div>
+        </form>
     </div>
 </body>
 </html>

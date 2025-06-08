@@ -3,67 +3,64 @@
 from flask import render_template, request, flash, redirect, url_for, Blueprint
 from app import services
 
-# Cria um "Blueprint", que é um conjunto de rotas que podem ser registradas na aplicação.
 bp = Blueprint('main', __name__)
 
 @bp.route('/', methods=['GET'])
 def index():
-    """Renderiza a página inicial."""
-    # [MITIGAÇÃO CWE-79] O Jinja2 do Flask escapa automaticamente os dados
+    """Exibe a calculadora vazia."""
     return render_template('index.html')
 
-@bp.route('/search', methods=['POST'])
-def search_cve():
-    """Processa o formulário de busca de CVE."""
+@bp.route('/prefill', methods=['POST'])
+def prefill_calculator():
+    """Busca uma CVE para preencher a calculadora."""
     cve_id = request.form.get('cve_id', '').strip()
 
     if not services.validate_cve_id(cve_id):
-        flash('Formato de CVE inválido. Por favor, use o formato: CVE-YYYY-NNNN.', 'danger')
+        flash('Formato de CVE inválido. Use o formato: CVE-YYYY-NNNN.', 'danger')
         return redirect(url_for('main.index'))
 
     try:
-        raw_data = services.fetch_cve_details(cve_id)
-        cve_data = services.parse_and_score_cve(raw_data)
+        nvd_data = services.fetch_cve_details(cve_id)
+        metrics, was_mapped = services.get_v4_metrics_from_nvd_data(nvd_data)
         
-        if not cve_data:
-            flash('Não foi possível analisar os dados da CVE recebidos da API.', 'warning')
+        if not metrics:
+            flash(f'Não foram encontradas métricas CVSS (v4.0 ou v3.1) para a CVE {cve_id}.', 'warning')
             return redirect(url_for('main.index'))
+        
+        cve_info = {
+            'id': nvd_data.get('id'),
+            'summary': next((desc['value'] for desc in nvd_data.get('descriptions', []) if desc['lang'] == 'en'), 'Sem resumo disponível.'),
+            'metrics': metrics
+        }
+
+        if was_mapped:
+            flash(f'Dados da CVE {cve_id} preenchidos a partir de CVSS v3.1. Revise os campos que não puderam ser mapeados.', 'info')
+        else:
+            flash(f'Dados da CVE {cve_id} preenchidos com sucesso.', 'success')
             
-        return render_template('index.html', cve=cve_data, get_severity=services.get_cvss_severity)
+        return render_template('index.html', cve_info=cve_info)
 
     except (ValueError, ConnectionError) as e:
         flash(str(e), 'danger')
         return redirect(url_for('main.index'))
 
-@bp.route('/recalculate', methods=['POST'])
-def recalculate_cvss():
-    """Processa o formulário de recálculo de CVSS."""
-    original_vector = request.form.get('original_vector')
+@bp.route('/calculate', methods=['POST'])
+def calculate():
+    """Calcula a pontuação a partir dos dados do formulário."""
+    form_data = request.form
     
-    if not original_vector:
-        flash('Vetor CVSS original não encontrado para o recálculo.', 'danger')
-        return redirect(url_for('main.index'))
+    result, error = services.calculate_v4_score_from_form(form_data)
     
-    try:
-        metrics = {k: v for k, v in request.form.items() if k.isupper()}
-        
-        recalculated_data = services.recalculate_scores(original_vector, metrics)
-        
-        # Monta a estrutura de dados para renderizar o template
-        cve_data_for_template = {
-            'id': request.form.get('cve_id_hidden', 'N/A'),
-            'summary': request.form.get('summary_hidden', ''),
-            'references': [],
-            'cvss_vector_v3': recalculated_data['vector'],
-            'cvss_obj': recalculated_data['cvss_obj'],
-            'scores': recalculated_data['scores'],
-            'recalculated': True
-        }
-        
-        flash('Pontuação CVSS recalculada com sucesso!', 'success')
-        return render_template('index.html', cve=cve_data_for_template, get_severity=services.get_cvss_severity)
-
-    except Exception as e:
-        flash(f'Erro ao recalcular a pontuação CVSS: {e}', 'danger')
-        return redirect(url_for('main.index'))
-
+    # Recria o objeto cve_info para reexibir os dados no formulário
+    cve_info = {
+        'id': form_data.get('cve_id_hidden'),
+        'summary': form_data.get('summary_hidden'),
+        'metrics': form_data
+    }
+    
+    if error:
+        flash(error, 'danger')
+        return render_template('index.html', cve_info=cve_info)
+    
+    # A função get_severity não é mais necessária aqui, pois a lógica foi movida para o service
+    return render_template('index.html', results=result, cve_info=cve_info)

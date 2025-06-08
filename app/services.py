@@ -2,124 +2,146 @@
 
 import re
 import requests
-from cvss import CVSS3
+from cvss import CVSS3, CVSS4
 
-# Constantes de configuração e segurança
-CVE_API_URL = "https://cve.circl.lu/api/cve/{}"
+# --- Constantes ---
+NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={}"
 CVE_REGEX = re.compile(r'^CVE-\d{4}-\d{4,}$', re.IGNORECASE)
 
+# --- Funções de Validação e Fetch ---
 def validate_cve_id(cve_id):
-    """
-    [MITIGAÇÃO CWE-20] Valida o formato do ID da CVE.
-    Retorna True se for válido, False caso contrário.
-    """
+    """Valida o formato do ID da CVE."""
     return CVE_REGEX.match(cve_id) is not None
 
 def fetch_cve_details(cve_id):
-    """
-    Busca os detalhes de uma CVE em uma API externa.
-    Retorna os dados em JSON ou lança uma exceção em caso de erro.
-    """
-    # [MITIGAÇÃO CWE-918] Garante que a URL é formada de maneira segura
-    api_url = CVE_API_URL.format(cve_id.upper())
-    
+    """Busca os detalhes da CVE usando a API do NVD."""
+    api_url = NVD_API_URL.format(cve_id.upper())
     try:
-        response = requests.get(api_url, timeout=10)
-        response.raise_for_status()  # Lança uma exceção para status de erro (4xx ou 5xx)
+        # Adiciona um User-Agent para identificação na API
+        headers = {'User-Agent': 'Trabalho Academico - Analisador de CVE'}
+        response = requests.get(api_url, headers=headers, timeout=15)
+        response.raise_for_status()  # Lança uma exceção para respostas com erro (4xx ou 5xx)
+        data = response.json()
+        if data.get('totalResults', 0) == 0:
+            raise ValueError(f'A CVE "{cve_id}" não foi encontrada na base de dados do NVD.')
+        return data['vulnerabilities'][0]['cve']
+    except (requests.exceptions.RequestException, KeyError) as e:
+        # Captura erros de conexão, timeout ou formato de JSON inesperado
+        raise ConnectionError(f'Erro ao buscar ou processar dados da API do NVD: {e}')
+
+# --- Função para extrair métricas para preencher a calculadora ---
+def get_v4_metrics_from_nvd_data(nvd_data):
+    """
+    Extrai um dicionário de métricas CVSS v4.0.
+    Prioriza dados v4.0 "Primary". Se não existirem, mapeia os dados v3.1 "Primary".
+    Retorna o dicionário de métricas e um booleano indicando se foi feito o mapeamento a partir da v3.1.
+    """
+    metrics = nvd_data.get('metrics', {})
+
+    def find_primary_vector(metric_list):
+        """Função auxiliar para encontrar o vetor do score primário."""
+        primary_metric = None
+        for metric in metric_list:
+            if metric.get('type') == 'Primary':
+                primary_metric = metric
+                break
         
-        # A API pode retornar 200 com 'null' se a CVE for rejeitada ou não encontrada.
-        json_response = response.json()
-        if json_response is None:
-             raise ValueError(f'A CVE "{cve_id}" não foi encontrada ou foi rejeitada.')
+        if not primary_metric and metric_list:
+            primary_metric = metric_list[0]
+            
+        return primary_metric['cvssData'].get('vectorString') if primary_metric else None
 
-        return json_response
+    # Prioridade 1: Usar dados CVSS v4.0 nativos
+    if 'cvssMetricV40' in metrics and metrics['cvssMetricV40']:
+        vector_string = find_primary_vector(metrics['cvssMetricV40'])
+        if vector_string:
+            cvss_obj = CVSS4(vector_string)
+            all_metrics = {key: value for key, value in cvss_obj.metrics.items()}
+            # Garante que todas as métricas possíveis tenham um valor padrão 'X' se não estiverem no vetor
+            all_possible_keys = ['AV', 'AC', 'AT', 'PR', 'UI', 'VC', 'VI', 'VA', 'SC', 'SI', 'SA', 'E', 'CR', 'IR', 'AR', 'MAV', 'MAC', 'MAT', 'MPR', 'MUI', 'MVC', 'MVI', 'MVA', 'MSC', 'MSI', 'MSA', 'S', 'AU', 'R', 'V', 'RE', 'P']
+            for key in all_possible_keys:
+                if key not in all_metrics:
+                    all_metrics[key] = 'X'
+            return all_metrics, False
 
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            # Re-lança um erro específico para "Não Encontrado"
-            raise ValueError(f'A CVE "{cve_id}" não foi encontrada.')
-        else:
-            # Re-lança outros erros HTTP
-            raise ConnectionError(f'Erro na API de CVEs. Status: {e.response.status_code}')
-    except requests.exceptions.RequestException as e:
-        # Lança um erro para problemas de conexão
-        raise ConnectionError(f'Erro de conexão com a API: {e}')
+    # Prioridade 2: Mapear dados CVSS v3.1 para v4.0
+    if 'cvssMetricV31' in metrics and metrics['cvssMetricV31']:
+        v3_vector = find_primary_vector(metrics['cvssMetricV31'])
+        if v3_vector:
+            v3 = CVSS3(v3_vector)
+            v3_metrics = v3.metrics
+            
+            v4_mapped_metrics = {
+                'AV': v3_metrics.get('AV', 'X'), 'AC': v3_metrics.get('AC', 'X'),
+                'PR': v3_metrics.get('PR', 'X'), 'UI': v3_metrics.get('UI', 'X'),
+                'AT': 'N',
+            }
 
-def get_cvss_severity(score):
-    """Converte uma pontuação CVSS numérica para uma classificação qualitativa."""
-    if score is None: return "N/A"
-    if 0.1 <= score <= 3.9: return f"Baixa ({score})"
-    if 4.0 <= score <= 6.9: return f"Média ({score})"
-    if 7.0 <= score <= 8.9: return f"Alta ({score})"
-    if 9.0 <= score <= 10.0: return f"Crítica ({score})"
-    return f"Nenhuma ({score})"
+            if v3_metrics.get('S') == 'U':
+                v4_mapped_metrics.update({'VC': v3_metrics.get('C', 'X'), 'VI': v3_metrics.get('I', 'X'), 'VA': v3_metrics.get('A', 'X'), 'SC': 'N', 'SI': 'N', 'SA': 'N'})
+            else:
+                v4_mapped_metrics.update({'VC': v3_metrics.get('C', 'X'), 'VI': v3_metrics.get('I', 'X'), 'VA': v3_metrics.get('A', 'X'), 'SC': v3_metrics.get('C', 'X'), 'SI': v3_metrics.get('I', 'X'), 'SA': v3_metrics.get('A', 'X')})
+            
+            # As métricas restantes recebem o valor padrão "Não Definido"
+            for metric in ['E', 'CR', 'IR', 'AR', 'MAV', 'MAC', 'MAT', 'MPR', 'MUI', 'MVC', 'MVI', 'MVA', 'MSC', 'MSI', 'MSA', 'S', 'AU', 'R', 'V', 'RE', 'P']:
+                v4_mapped_metrics[metric] = 'X'
+                
+            return v4_mapped_metrics, True
 
-def parse_and_score_cve(data):
+    return None, False
+
+# --- Função de Cálculo ---
+def calculate_v4_score_from_form(form_data):
     """
-    Analisa os dados brutos da API e calcula as pontuações CVSS.
-    Esta função lida com a estrutura aninhada do JSON (formato CVE 5.0).
+    Constrói um vetor CVSS v4.0 a partir de todos os dados do formulário e calcula as pontuações.
     """
-    if not data:
-        return None
+    # Ordem das chaves conforme a especificação CVSS v4.0 para a construção correta do vetor
+    ordered_keys = [
+        # Base
+        'AV', 'AC', 'AT', 'PR', 'UI', 'VC', 'VI', 'VA', 'SC', 'SI', 'SA', 
+        # Threat
+        'E', 
+        # Environmental
+        'CR', 'IR', 'AR', 'MAV', 'MAC', 'MAT', 'MPR', 'MUI', 'MVC', 'MVI', 'MVA', 'MSC', 'MSI', 'MSA', 
+        # Supplemental
+        'S', 'AU', 'R', 'V', 'RE', 'P'
+    ]
+    
+    vector_parts = ["CVSS:4.0"]
+    for key in ordered_keys:
+        value = form_data.get(key)
+        # Adiciona ao vetor apenas se o valor não for 'X' (Não Definido), exceto para métricas obrigatórias
+        if value and (value != 'X' or key in ['AV', 'AC', 'AT', 'PR', 'UI', 'VC', 'VI', 'VA', 'SC', 'SI', 'SA']):
+            vector_parts.append(f"{key}:{value}")
+    
+    vector_string = "/".join(vector_parts)
     
     try:
-        cna_container = data.get('containers', {}).get('cna', {})
-        cve_id = data.get('cveMetadata', {}).get('cveId', 'N/A')
-        descriptions = cna_container.get('descriptions', [{}])
-        summary = descriptions[0].get('value', 'Sem resumo disponível.') if descriptions else 'Sem resumo disponível.'
-        references_list = cna_container.get('references', [])
-        references = [ref.get('url') for ref in references_list if ref.get('url')]
-        metrics = cna_container.get('metrics', [{}])
-        cvss_data = metrics[0].get('cvssV3_1', {}) if metrics else {}
-        cvss_vector_v3 = cvss_data.get('vectorString')
-    except (IndexError, AttributeError):
-        return None
+        cvss_obj = CVSS4(vector_string)
+        
+        scores_list = cvss_obj.scores()
+        severities_list = cvss_obj.severities()
 
-    cvss_obj = None
-    scores = {'base': None, 'temporal': None, 'environmental': None}
-    
-    if cvss_vector_v3:
-        try:
-            cvss_obj = CVSS3(cvss_vector_v3)
-            scores['base'] = cvss_obj.base_score
-            scores['temporal'] = cvss_obj.temporal_score
-            scores['environmental'] = cvss_obj.environmental_score
-        except Exception as e:
-            print(f"Erro ao parsear o vetor CVSS v3: {e}")
-            cvss_vector_v3 = f"Vetor inválido: {cvss_vector_v3}"
-
-    return {
-        'id': cve_id,
-        'summary': summary,
-        'references': references,
-        'cvss_vector_v3': cvss_vector_v3,
-        'cvss_obj': cvss_obj,
-        'scores': scores
-    }
-
-
-def recalculate_scores(original_vector, metrics):
-    """
-    Recalcula as pontuações CVSS com base nas métricas ambientais/temporais.
-    ATUALIZADO: Corrige o erro ao atualizar o objeto cvss.
-    """
-    cvss_obj = CVSS3(original_vector)
-    
-    # Itera sobre as métricas recebidas e atualiza o objeto CVSS atributo por atributo.
-    # O método 'update_from_dict' não existe na biblioteca 'cvss'.
-    for key, value in metrics.items():
-        # Só atualiza se um valor diferente do padrão foi selecionado pelo usuário
-        if hasattr(cvss_obj, key):
-            setattr(cvss_obj, key, value)
-            
-    # A biblioteca recalcula os scores automaticamente quando os atributos são acessados.
-    return {
-        'cvss_obj': cvss_obj,
-        'vector': cvss_obj.vector,
-        'scores': {
-            'base': cvss_obj.base_score,
-            'temporal': cvss_obj.temporal_score,
-            'environmental': cvss_obj.environmental_score
+        severity_map = {
+            'None': {'class': 'none', 'name': 'Nenhuma'}, 'Low': {'class': 'low', 'name': 'Baixa'},
+            'Medium': {'class': 'medium', 'name': 'Média'}, 'High': {'class': 'high', 'name': 'Alta'},
+            'Critical': {'class': 'critical', 'name': 'Crítica'}
         }
-    }
 
+        base_score = scores_list[0] if len(scores_list) > 0 else 0.0
+        threat_score = scores_list[1] if len(scores_list) > 1 else None
+        environmental_score = scores_list[2] if len(scores_list) > 2 else None
+
+        base_sev_info = severity_map.get(severities_list[0]) if len(severities_list) > 0 else severity_map['None']
+        threat_sev_info = severity_map.get(severities_list[1]) if len(severities_list) > 1 else severity_map['None']
+        env_sev_info = severity_map.get(severities_list[2]) if len(severities_list) > 2 else severity_map['None']
+
+        return {
+            'vector': cvss_obj.vector,
+            'base': {'score': base_score, 'severity': base_sev_info},
+            'threat': {'score': threat_score, 'severity': threat_sev_info},
+            'environmental': {'score': environmental_score, 'severity': env_sev_info}
+        }, None
+    except Exception as e:
+        error_message = f"Erro ao calcular com o vetor fornecido: {e}. Vetor tentado: '{vector_string}'"
+        return None, error_message
