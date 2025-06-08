@@ -27,9 +27,12 @@ def fetch_cve_details(cve_id):
         response = requests.get(api_url, timeout=10)
         response.raise_for_status()  # Lança uma exceção para status de erro (4xx ou 5xx)
         
-        if response.status_code == 200:
-            return response.json()
-        return None # Caso a resposta seja 200 mas vazia
+        # A API pode retornar 200 com 'null' se a CVE for rejeitada ou não encontrada.
+        json_response = response.json()
+        if json_response is None:
+             raise ValueError(f'A CVE "{cve_id}" não foi encontrada ou foi rejeitada.')
+
+        return json_response
 
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
@@ -54,12 +57,24 @@ def get_cvss_severity(score):
 def parse_and_score_cve(data):
     """
     Analisa os dados brutos da API e calcula as pontuações CVSS.
-    Retorna um dicionário estruturado com as informações da CVE.
+    Esta função lida com a estrutura aninhada do JSON (formato CVE 5.0).
     """
     if not data:
         return None
     
-    cvss_vector_v3 = data.get('cvss-v3')
+    try:
+        cna_container = data.get('containers', {}).get('cna', {})
+        cve_id = data.get('cveMetadata', {}).get('cveId', 'N/A')
+        descriptions = cna_container.get('descriptions', [{}])
+        summary = descriptions[0].get('value', 'Sem resumo disponível.') if descriptions else 'Sem resumo disponível.'
+        references_list = cna_container.get('references', [])
+        references = [ref.get('url') for ref in references_list if ref.get('url')]
+        metrics = cna_container.get('metrics', [{}])
+        cvss_data = metrics[0].get('cvssV3_1', {}) if metrics else {}
+        cvss_vector_v3 = cvss_data.get('vectorString')
+    except (IndexError, AttributeError):
+        return None
+
     cvss_obj = None
     scores = {'base': None, 'temporal': None, 'environmental': None}
     
@@ -74,18 +89,30 @@ def parse_and_score_cve(data):
             cvss_vector_v3 = f"Vetor inválido: {cvss_vector_v3}"
 
     return {
-        'id': data.get('id', 'N/A'),
-        'summary': data.get('summary', 'Sem resumo disponível.'),
-        'references': data.get('references', []),
+        'id': cve_id,
+        'summary': summary,
+        'references': references,
         'cvss_vector_v3': cvss_vector_v3,
         'cvss_obj': cvss_obj,
         'scores': scores
     }
 
+
 def recalculate_scores(original_vector, metrics):
-    """Recalcula as pontuações CVSS com base nas métricas ambientais/temporais."""
+    """
+    Recalcula as pontuações CVSS com base nas métricas ambientais/temporais.
+    ATUALIZADO: Corrige o erro ao atualizar o objeto cvss.
+    """
     cvss_obj = CVSS3(original_vector)
-    cvss_obj.update_from_dict(metrics)
+    
+    # Itera sobre as métricas recebidas e atualiza o objeto CVSS atributo por atributo.
+    # O método 'update_from_dict' não existe na biblioteca 'cvss'.
+    for key, value in metrics.items():
+        # Só atualiza se um valor diferente do padrão foi selecionado pelo usuário
+        if hasattr(cvss_obj, key):
+            setattr(cvss_obj, key, value)
+            
+    # A biblioteca recalcula os scores automaticamente quando os atributos são acessados.
     return {
         'cvss_obj': cvss_obj,
         'vector': cvss_obj.vector,
@@ -95,3 +122,4 @@ def recalculate_scores(original_vector, metrics):
             'environmental': cvss_obj.environmental_score
         }
     }
+

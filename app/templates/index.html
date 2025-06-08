@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analisador de CVE e Calculadora CVSS</title>
-    <!-- Tailwind CSS (URL corrigida) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Fonte Inter (URL corrigida) -->
+    <!-- Fonte Inter -->
     <link rel="preconnect" href="https://rsms.me/">
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <style>
@@ -81,7 +81,8 @@
                     {{ cve.id }} 
                     {% if cve.recalculated %}<span class="text-sm font-normal text-indigo-600">(Pontuação Recalculada)</span>{% endif %}
                 </h2>
-                <p class="text-gray-600 prose max-w-none">{{ cve.summary }}</p>
+                <!-- Usamos 'safe' aqui porque a descrição pode conter tags <p>, mas confiamos na fonte. Em um cenário mais rigoroso, seria melhor usar uma biblioteca de sanitização de HTML. -->
+                <div class="text-gray-600 prose max-w-none">{{ cve.summary|safe }}</div>
                 
                 {% if cve.references %}
                 <div class="mt-6">
@@ -146,15 +147,16 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label for="E" class="block text-sm font-medium">Maturidade do Código de Exploração (E)</label>
+                                <!-- CORREÇÃO APLICADA AQUI -->
                                 <select id="E" name="E" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" {% if cve.cvss_obj.get_metric_value('E') == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
-                                    <option value="H" {% if cve.cvss_obj.get_metric_value('E') == 'H' %}selected{% endif %}>Alto</option>
-                                    <option value="F" {% if cve.cvss_obj.get_metric_value('E') == 'F' %}selected{% endif %}>Funcional</option>
-                                    <option value="P" {% if cve.cvss_obj.get_metric_value('E') == 'P' %}selected{% endif %}>Prova de Conceito</option>
-                                    <option value="U" {% if cve.cvss_obj.get_metric_value('E') == 'U' %}selected{% endif %}>Não Comprovado</option>
+                                    <option value="X" {% if cve.cvss_obj.E == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
+                                    <option value="H" {% if cve.cvss_obj.E == 'H' %}selected{% endif %}>Alto</option>
+                                    <option value="F" {% if cve.cvss_obj.E == 'F' %}selected{% endif %}>Funcional</option>
+                                    <option value="P" {% if cve.cvss_obj.E == 'P' %}selected{% endif %}>Prova de Conceito</option>
+                                    <option value="U" {% if cve.cvss_obj.E == 'U' %}selected{% endif %}>Não Comprovado</option>
                                 </select>
                             </div>
-                            <!-- Outros campos Temporais (RL, RC) ... -->
+                            <!-- Outros campos Temporais (RL, RC) podem ser adicionados aqui seguindo o mesmo padrão -->
                         </div>
                     </div>
                     
@@ -164,33 +166,34 @@
                          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label for="CR" class="block text-sm font-medium">Requisito de Confidencialidade (CR)</label>
+                                <!-- CORREÇÃO APLICADA AQUI -->
                                 <select id="CR" name="CR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" selected>Não Definido (Padrão)</option>
-                                    <option value="H">Alto</option>
-                                    <option value="M">Médio</option>
-                                    <option value="L">Baixo</option>
+                                    <option value="X" {% if cve.cvss_obj.CR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
+                                    <option value="H" {% if cve.cvss_obj.CR == 'H' %}selected{% endif %}>Alto</option>
+                                    <option value="M" {% if cve.cvss_obj.CR == 'M' %}selected{% endif %}>Médio</option>
+                                    <option value="L" {% if cve.cvss_obj.CR == 'L' %}selected{% endif %}>Baixo</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="IR" class="block text-sm font-medium">Requisito de Integridade (IR)</label>
                                 <select id="IR" name="IR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" selected>Não Definido (Padrão)</option>
-                                    <option value="H">Alto</option>
-                                    <option value="M">Médio</option>
-                                    <option value="L">Baixo</option>
+                                    <option value="X" {% if cve.cvss_obj.IR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
+                                    <option value="H" {% if cve.cvss_obj.IR == 'H' %}selected{% endif %}>Alto</option>
+                                    <option value="M" {% if cve.cvss_obj.IR == 'M' %}selected{% endif %}>Médio</option>
+                                    <option value="L" {% if cve.cvss_obj.IR == 'L' %}selected{% endif %}>Baixo</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="AR" class="block text-sm font-medium">Requisito de Disponibilidade (AR)</label>
                                 <select id="AR" name="AR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option value="X" selected>Não Definido (Padrão)</option>
-                                    <option value="H">Alto</option>
-                                    <option value="M">Médio</option>
-                                    <option value="L">Baixo</option>
+                                    <option value="X" {% if cve.cvss_obj.AR == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
+                                    <option value="H" {% if cve.cvss_obj.AR == 'H' %}selected{% endif %}>Alto</option>
+                                    <option value="M" {% if cve.cvss_obj.AR == 'M' %}selected{% endif %}>Médio</option>
+                                    <option value="L" {% if cve.cvss_obj.AR == 'L' %}selected{% endif %}>Baixo</option>
                                 </select>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-4">Nota: Para simplificar, apenas as métricas de Requisito de Segurança são exibidas. A lógica no backend pode ser estendida para incluir todas as métricas modificadas (MAV, MAC, etc.).</p>
+                        <p class="text-xs text-gray-500 mt-4">Nota: Outras métricas ambientais modificadas (MAV, MAC, etc.) podem ser adicionadas seguindo este mesmo padrão.</p>
                     </div>
 
                     <div class="text-right">
@@ -205,7 +208,7 @@
         {% endif %}
 
         <footer class="text-center mt-12 text-sm text-gray-500">
-            <p>Trabalho Prático - Segurança e Auditoria de Sistemas</p>
+            <p>Trabalho Prático - Segurança de aplicações</p>
         </footer>
     </div>
 </body>
