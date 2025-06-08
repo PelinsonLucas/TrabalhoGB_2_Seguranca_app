@@ -1,0 +1,212 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de CVE e Calculadora CVSS</title>
+    <!-- Tailwind CSS (URL corrigida) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonte Inter (URL corrigida) -->
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <style>
+        /* Estilos adicionais para melhorar a aparência */
+        html { font-family: 'Inter', sans-serif; }
+        @supports (font-variation-settings: normal) {
+            html { font-family: 'Inter var', sans-serif; }
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+        }
+        .score-box {
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+            text-align: center;
+        }
+        .score-low { background-color: #fefcbf; color: #92400e; border: 1px solid #fde68a; }
+        .score-medium { background-color: #fed7aa; color: #9a3412; border: 1px solid #fdba74; }
+        .score-high { background-color: #fecaca; color: #991b1b; border: 1px solid #fca5a5; }
+        .score-critical { background-color: #e0b0ff; color: #5b21b6; border: 1px solid #d8b4fe; }
+        .score-none { background-color: #e5e7eb; color: #4b5563; border: 1px solid #d1d5db; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Analisador de Vulnerabilidades (CVE)</h1>
+            <p class="text-md text-gray-600 mt-2">Insira um ID de CVE para ver detalhes e calcular a pontuação CVSS v3.1</p>
+        </header>
+        
+        <!-- Formulário de Busca -->
+        <div class="max-w-2xl mx-auto card p-6 mb-8">
+            <form action="{{ url_for('main.search_cve') }}" method="POST">
+                <label for="cve_id" class="block text-sm font-medium text-gray-700 mb-2">ID da Vulnerabilidade (ex: CVE-2021-34527)</label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" name="cve_id" id="cve_id" required class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="CVE-XXXX-XXXXX">
+                    <button type="submit" class="w-full sm:w-auto inline-flex justify-center items-center px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Analisar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Seção de Alertas e Mensagens -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="max-w-2xl mx-auto mb-8">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-md 
+                        {% if category == 'danger' %} bg-red-100 text-red-700 
+                        {% elif category == 'success' %} bg-green-100 text-green-700 
+                        {% else %} bg-yellow-100 text-yellow-700 {% endif %}"
+                        role="alert">
+                        <p>{{ message }}</p>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Seção de Resultados -->
+        {% if cve %}
+        <div class="max-w-4xl mx-auto">
+            <!-- Card de Informações Gerais -->
+            <div class="card p-6 md:p-8 mb-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-1">
+                    {{ cve.id }} 
+                    {% if cve.recalculated %}<span class="text-sm font-normal text-indigo-600">(Pontuação Recalculada)</span>{% endif %}
+                </h2>
+                <p class="text-gray-600 prose max-w-none">{{ cve.summary }}</p>
+                
+                {% if cve.references %}
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold text-gray-800">Referências</h3>
+                    <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
+                        {% for ref in cve.references[:5] %} <!-- Mostra até 5 referências -->
+                        <li><a href="{{ ref }}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">{{ ref }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Card de Pontuação CVSS -->
+            <div class="card p-6 md:p-8 mb-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Pontuação CVSS v3.1</h3>
+                
+                {% if cve.cvss_obj %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    {% set base_sev = get_severity(cve.scores.base) %}
+                    {% set temp_sev = get_severity(cve.scores.temporal) %}
+                    {% set env_sev = get_severity(cve.scores.environmental) %}
+                    <div class="score-box {{ 'score-' + base_sev.split(' ')[0]|lower }}">
+                        <div class="text-sm font-semibold uppercase tracking-wider">Base</div>
+                        <div class="text-3xl font-bold">{{ cve.scores.base }}</div>
+                        <div class="text-sm">{{ base_sev.split(' ')[0] }}</div>
+                    </div>
+                    <div class="score-box {{ 'score-' + temp_sev.split(' ')[0]|lower }}">
+                        <div class="text-sm font-semibold uppercase tracking-wider">Temporal</div>
+                        <div class="text-3xl font-bold">{{ cve.scores.temporal }}</div>
+                        <div class="text-sm">{{ temp_sev.split(' ')[0] }}</div>
+                    </div>
+                     <div class="score-box {{ 'score-' + env_sev.split(' ')[0]|lower }}">
+                        <div class="text-sm font-semibold uppercase tracking-wider">Ambiental</div>
+                        <div class="text-3xl font-bold">{{ cve.scores.environmental }}</div>
+                        <div class="text-sm">{{ env_sev.split(' ')[0] }}</div>
+                    </div>
+                </div>
+                <div class="text-center bg-gray-100 p-2 rounded-md">
+                    <p class="text-sm text-gray-600 font-mono break-all">{{ cve.cvss_vector_v3 }}</p>
+                </div>
+                {% else %}
+                <p class="text-gray-500">Nenhuma informação CVSS v3.1 disponível para esta CVE na API.</p>
+                {% endif %}
+            </div>
+
+            <!-- Formulário da Calculadora Ambiental e Temporal -->
+            {% if cve.cvss_obj %}
+            <div class="card p-6 md:p-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Calculadora CVSS Interativa</h3>
+                <p class="text-sm text-gray-600 mb-6">A API forneceu as métricas básicas. Preencha ou ajuste as métricas Temporais e Ambientais abaixo para recalcular a pontuação de acordo com o seu ambiente.</p>
+                
+                <form action="{{ url_for('main.recalculate_cvss') }}" method="POST">
+                    <!-- Campos ocultos para passar dados necessários para o recálculo -->
+                    <input type="hidden" name="original_vector" value="{{ cve.cvss_obj.vector }}">
+                    <input type="hidden" name="cve_id_hidden" value="{{ cve.id }}">
+                    <input type="hidden" name="summary_hidden" value="{{ cve.summary }}">
+
+                    <!-- Métricas Temporais -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">Métricas Temporais</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="E" class="block text-sm font-medium">Maturidade do Código de Exploração (E)</label>
+                                <select id="E" name="E" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="X" {% if cve.cvss_obj.get_metric_value('E') == 'X' %}selected{% endif %}>Não Definido (Padrão)</option>
+                                    <option value="H" {% if cve.cvss_obj.get_metric_value('E') == 'H' %}selected{% endif %}>Alto</option>
+                                    <option value="F" {% if cve.cvss_obj.get_metric_value('E') == 'F' %}selected{% endif %}>Funcional</option>
+                                    <option value="P" {% if cve.cvss_obj.get_metric_value('E') == 'P' %}selected{% endif %}>Prova de Conceito</option>
+                                    <option value="U" {% if cve.cvss_obj.get_metric_value('E') == 'U' %}selected{% endif %}>Não Comprovado</option>
+                                </select>
+                            </div>
+                            <!-- Outros campos Temporais (RL, RC) ... -->
+                        </div>
+                    </div>
+                    
+                    <!-- Métricas Ambientais (exemplo com alguns campos) -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">Métricas Ambientais</h4>
+                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="CR" class="block text-sm font-medium">Requisito de Confidencialidade (CR)</label>
+                                <select id="CR" name="CR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="X" selected>Não Definido (Padrão)</option>
+                                    <option value="H">Alto</option>
+                                    <option value="M">Médio</option>
+                                    <option value="L">Baixo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="IR" class="block text-sm font-medium">Requisito de Integridade (IR)</label>
+                                <select id="IR" name="IR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="X" selected>Não Definido (Padrão)</option>
+                                    <option value="H">Alto</option>
+                                    <option value="M">Médio</option>
+                                    <option value="L">Baixo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="AR" class="block text-sm font-medium">Requisito de Disponibilidade (AR)</label>
+                                <select id="AR" name="AR" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="X" selected>Não Definido (Padrão)</option>
+                                    <option value="H">Alto</option>
+                                    <option value="M">Médio</option>
+                                    <option value="L">Baixo</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-4">Nota: Para simplificar, apenas as métricas de Requisito de Segurança são exibidas. A lógica no backend pode ser estendida para incluir todas as métricas modificadas (MAV, MAC, etc.).</p>
+                    </div>
+
+                    <div class="text-right">
+                        <button type="submit" class="inline-flex justify-center items-center px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            Recalcular Pontuação
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <footer class="text-center mt-12 text-sm text-gray-500">
+            <p>Trabalho Prático - Segurança e Auditoria de Sistemas</p>
+        </footer>
+    </div>
+</body>
+</html>
