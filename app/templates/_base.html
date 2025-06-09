@@ -1,0 +1,98 @@
+<!-- templates/_base.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora CVSS 4.0 & 3.1 Interativa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <style>
+        html { font-family: 'Inter', sans-serif; }
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+        .score-box { border-radius: 0.5rem; padding: 1rem; text-align: center; }
+        /* Cores para v4.0 e v3.1 */
+        .score-low { background-color: #fefce8; color: #a16207; border-color: #fde68a; }
+        .score-medium { background-color: #fff7ed; color: #c2410c; border-color: #fdba74; }
+        .score-high { background-color: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+        .score-critical, .score-crítica { background-color: #fce7f3; color: #9d174d; border-color: #fbcfe8; }
+        .score-none, .score-nenhuma { background-color: #f9fafb; color: #4b5563; border-color: #d1d5db; }
+        .metric-group { border-top: 1px solid #e5e7eb; padding-top: 1.5rem; margin-top: 1.5rem; }
+        
+        /* Estilos para o seletor de versão */
+        .version-switch button { transition: all 0.2s ease-in-out; }
+        .version-switch button.active { background-color: #4f46e5; color: white; }
+        .version-switch button:not(.active) { background-color: #e5e7eb; color: #374151; }
+        .version-switch button.disabled { background-color: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+
+        /* Esconder formulários inativos */
+        .calculator-form { display: none; }
+        .calculator-form.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const btnV4 = document.getElementById('btn-v4');
+            const btnV31 = document.getElementById('btn-v31');
+            const formV4 = document.getElementById('form-v4');
+            const formV31 = document.getElementById('form-v31');
+            const versionInput = document.getElementById('cvss_version_input');
+            
+            // Verifica se os dados da CVE estão presentes para habilitar/desabilitar botões
+            const hasV4Input = document.querySelector('input[name="has_v4"]');
+            const hasV31Input = document.querySelector('input[name="has_v31"]');
+
+            function switchVersion(version) {
+                // Previne a troca se o botão estiver desabilitado
+                if (version === '4.0' && btnV4.disabled) return;
+                if (version === '3.1' && btnV31.disabled) return;
+
+                if (version === '4.0') {
+                    btnV4.classList.add('active');
+                    btnV31.classList.remove('active');
+                    formV4.classList.add('active');
+                    formV31.classList.remove('active');
+                    versionInput.value = '4.0';
+                } else {
+                    btnV31.classList.add('active');
+                    btnV4.classList.remove('active');
+                    formV31.classList.add('active');
+                    formV4.classList.remove('active');
+                    versionInput.value = '3.1';
+                }
+            }
+
+            if (btnV4) btnV4.addEventListener('click', () => switchVersion('4.0'));
+            if (btnV31) btnV31.addEventListener('click', () => switchVersion('3.1'));
+
+            // Lógica de inicialização para desabilitar botões
+            if (hasV4Input && hasV4Input.value === 'False') {
+                btnV4.classList.add('disabled');
+                btnV4.disabled = true;
+            }
+            if (hasV31Input && hasV31Input.value === 'False') {
+                btnV31.classList.add('disabled');
+                btnV31.disabled = true;
+            }
+
+            // Define a calculadora ativa na carga da página
+            const activeVersionOnLoad = versionInput.value || '4.0';
+            
+            if (activeVersionOnLoad === '4.0' && !btnV4.disabled) {
+                switchVersion('4.0');
+            } else if (activeVersionOnLoad === '3.1' && !btnV31.disabled) {
+                switchVersion('3.1');
+            } else if (!btnV4.disabled) { // Fallback para v4 se a ativa estiver desabilitada
+                switchVersion('4.0');
+            } else if (!btnV31.disabled) { // Fallback para v3.1 se v4 também estiver desabilitada
+                switchVersion('3.1');
+            }
+        });
+    </script>
+</body>
+</html>
