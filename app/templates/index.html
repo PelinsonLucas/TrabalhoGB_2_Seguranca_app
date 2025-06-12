@@ -1,14 +1,16 @@
 {% extends "_base.html" %}
 
 {% block content %}
+<!-- Cabeçalho da página -->
 <header class="text-center mb-8">
     <h1 class="text-4xl font-bold tracking-tight text-gray-900">Calculadora CVSS</h1>
     <p class="text-lg text-gray-600 mt-2">Calcule pontuações CVSS v4.0 e v3.1.</p>
 </header>
 
-<!-- Formulário para preencher com CVE -->
+<!-- Formulário de busca de CVE -->
 <div class="card p-6 mb-8">
     <form action="{{ url_for('main.prefill_calculator') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <label for="cve_id" class="block text-sm font-semibold text-gray-700">Preencher com uma CVE (Opcional)</label>
         <div class="mt-2 flex flex-col sm:flex-row gap-2">
             <input type="text" name="cve_id" id="cve_id" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: CVE-2021-44228">
@@ -17,7 +19,7 @@
     </form>
 </div>
 
-<!-- Mensagens e Alertas -->
+<!-- Área de mensagens e alertas do sistema -->
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         <div class="mb-8 space-y-4">
@@ -29,13 +31,13 @@
     {% endif %}
 {% endwith %}
 
-<!-- Card de Informações da CVE -->
+<!-- Exibição das informações da CVE encontrada -->
 {% if cve_info and cve_info.id %}
 <div class="card p-6 md:p-8 mb-8">
     <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ cve_info.id }}</h2>
-    <div class="text-gray-600 prose max-w-none">{{ cve_info.summary|safe }}</div>
+    <div class="text-gray-600 prose max-w-none">{{ cve_info.summary }}</div>
     
-    <!-- Vetor Original (para debug) -->
+    <!-- Exibição dos vetores originais para referência -->
     {% if cve_info.original_vector_v31 or cve_info.original_vector_v4 %}
     <div class="mt-4 p-3 bg-gray-100 rounded-md">
         <p class="text-sm text-gray-800 font-semibold">Vetores Originais:</p>
@@ -50,26 +52,20 @@
 </div>
 {% endif %}
 
-<!-- Seção de Resultados -->
+<!-- Exibição dos resultados do cálculo CVSS -->
 {% if results %}
 <div class="card p-6 mb-8">
     <h3 class="text-xl font-bold text-gray-900 mb-4">Resultados do Cálculo (CVSS {{ results_version }})</h3>
      {% if results_version == '4.0' %}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <!-- Exibição dos resultados para CVSS v4.0 - Apenas pontuação base -->
+        <div class="grid grid-cols-1 gap-4 mb-6">
             <div class="score-box border score-{{ results.severities.base|lower if results.severities.base else 'none' }}">
                 <div>Base ({{ results.severities.base or 'Nenhuma' }})</div>
                 <div class="text-3xl font-bold">{{ "%.1f"|format(results.scores.base) if results.scores.base is not none else '-' }}</div>
             </div>
-            <div class="score-box border score-{{ results.severities.threat|lower if results.severities.threat else 'none' }}">
-                <div>Ameaça ({{ results.severities.threat or 'Nenhuma' }})</div>
-                <div class="text-3xl font-bold">{{ "%.1f"|format(results.scores.threat) if results.scores.threat is not none else '-' }}</div>
-            </div>
-            <div class="score-box border score-{{ results.severities.environmental|lower if results.severities.environmental else 'none' }}">
-                <div>Ambiental ({{ results.severities.environmental or 'Nenhuma' }})</div>
-                <div class="text-3xl font-bold">{{ "%.1f"|format(results.scores.environmental) if results.scores.environmental is not none else '-' }}</div>
-            </div>
         </div>
     {% else %}
+        <!-- Exibição dos resultados para CVSS v3.1 - Todas as pontuações -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="score-box border score-{{ results.severities.base|lower }}">
                 <div>Base ({{ results.severities.base }})</div>
@@ -85,6 +81,7 @@
             </div>
         </div>
     {% endif %}
+    <!-- Exibição do vetor CVSS calculado -->
     <div class="text-center bg-gray-100 p-3 rounded-md">
         <p class="text-sm text-gray-800 font-semibold">Vetor Calculado:</p>
         <p class="text-sm text-gray-600 font-mono break-all">{{ results.vector }}</p>
@@ -92,8 +89,9 @@
 </div>
 {% endif %}
 
-<!-- Seletor de Versão e Formulário Principal -->
+<!-- Seletor de versão CVSS e formulário de cálculo -->
 <div class="card p-6 md:p-8">
+    <!-- Botões para alternar entre versões CVSS -->
     <div class="version-switch flex justify-center mb-6">
         <div class="inline-flex rounded-md shadow-sm" role="group">
             <button type="button" id="btn-v4" class="rounded-l-lg px-4 py-2 font-medium focus:z-10 focus:ring-2 focus:ring-indigo-500">CVSS 4.0</button>
@@ -101,8 +99,12 @@
         </div>
     </div>
 
+    <!-- Formulário principal de métricas CVSS -->
     <form action="{{ url_for('main.calculate') }}" method="POST">
-        <!-- Campos ocultos para manter estado -->
+        <!-- Adicionar token CSRF -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <!-- Campos ocultos para manter o estado entre submissões -->
         {% if cve_info %}
             <input type="hidden" name="cve_id_hidden" value="{{ cve_info.id }}">
             <input type="hidden" name="summary_hidden" value="{{ cve_info.summary }}">
@@ -111,15 +113,17 @@
         {% endif %}
         <input type="hidden" name="cvss_version" id="cvss_version_input" value="{{ active_version or '4.0' }}">
 
-        {# LÓGICA ATUALIZADA AQUI: Usa as variáveis de métricas de nível superior #}
+        <!-- Inclusão do formulário para CVSS v4.0 -->
         {% with metrics = metrics_v4 or {} %}
             {% include '_form_v4.html' %}
         {% endwith %}
 
+        <!-- Inclusão do formulário para CVSS v3.1 -->
         {% with metrics = metrics_v31 or {} %}
             {% include '_form_v31.html' %}
         {% endwith %}
 
+        <!-- Botão de cálculo -->
         <div class="mt-8 text-center">
             <button type="submit" class="w-full sm:w-1/2 inline-flex justify-center items-center px-8 py-3 border border-transparent text-lg font-bold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">Calcular Pontuação</button>
         </div>

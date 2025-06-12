@@ -2,6 +2,7 @@
 
 from flask import Flask
 from config import Config
+from flask_wtf.csrf import CSRFProtect
 
 def create_app(config_class=Config):
     """
@@ -12,6 +13,9 @@ def create_app(config_class=Config):
     
     # Carrega as configurações a partir do objeto Config
     app.config.from_object(config_class)
+
+    # Inicializar proteção CSRF
+    csrf = CSRFProtect(app)
 
     # Registra as rotas (views) na aplicação
     # É importante importar aqui para evitar importações circulares
