@@ -73,8 +73,7 @@ def calculate():
     1. Recebe todos os dados do formulário
     2. Determina qual versão CVSS está sendo usada (3.1 ou 4.0)
     3. Calcula a pontuação CVSS correspondente
-    4. Preserva o estado dos formulários para permitir ajustes
-    5. Exibe os resultados do cálculo
+    4. Exibe os resultados do cálculo
     """
     form_data = request.form
     cvss_version = form_data.get('cvss_version', '4.0')

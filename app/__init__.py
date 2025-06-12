@@ -5,10 +5,6 @@ from config import Config
 from flask_wtf.csrf import CSRFProtect
 
 def create_app(config_class=Config):
-    """
-    Cria e configura uma instância da aplicação Flask.
-    Este é o padrão "Application Factory".
-    """
     app = Flask(__name__)
     
     # Carrega as configurações a partir do objeto Config
